@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Freunde-App</title>
+    <meta name="theme-color" content="#4a90d9">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .app-container {
+            width: 100%;
+            max-width: 430px;
+            height: 100vh;
+            max-height: 932px;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 40px 24px;
+            position: relative;
+        }
+        .header {
+            text-align: center;
+            padding-top: 20px;
+        }
+        .status-badge {
+            display: inline-block;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+        .event-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #333;
+            line-height: 1.3;
+        }
+        .timer-section {
+            text-align: center;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .timer-display {
+            font-size: 72px;
+            font-weight: 800;
+            color: #4a90d9;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            letter-spacing: -2px;
+        }
+        .timer-label {
+            font-size: 14px;
+            color: #888;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .extend-section {
+            padding-bottom: 20px;
+        }
+        .extend-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .extend-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .extend-btn {
+            flex: 1;
+            padding: 18px 8px;
+            border: 2px solid #e0e0e0;
+            border-radius: 14px;
+            background: #fff;
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+        .extend-btn:active {
+            transform: scale(0.96);
+        }
+        .extend-btn.selected {
+            border-color: #4a90d9;
+            background: #e8f0fe;
+            color: #4a90d9;
+        }
+        .extend-btn .sub {
+            font-size: 11px;
+            font-weight: 400;
+            color: #888;
+            margin-top: 4px;
+        }
+        .ok-btn {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 14px;
+            background: #4a90d9;
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .ok-btn.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .ok-btn:active {
+            transform: scale(0.98);
+        }
+        .reset-btn {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 14px;
+            background: #fff;
+            color: #888;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-top: 12px;
+        }
+        .reset-btn:active {
+            transform: scale(0.98);
+            background: #f5f5f5;
+        }
+        .confirm-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            z-index: 100;
+        }
+        .confirm-overlay.show {
+            display: flex;
+        }
+        .confirm-dialog {
+            background: white;
+            border-radius: 20px;
+            padding: 32px 24px;
+            text-align: center;
+            width: 100%;
+            max-width: 320px;
+        }
+        .confirm-dialog .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .confirm-dialog h3 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .confirm-dialog p {
+            font-size: 15px;
+            color: #666;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .confirm-dialog .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+        .confirm-dialog button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-cancel {
+            background: #f0f0f0;
+            color: #666;
+        }
+        .btn-confirm {
+            background: #4a90d9;
+            color: white;
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <div class="status-badge" id="statusBadge">Aktiv</div>
+            <div class="event-title">Abend mit Freunden</div>
+        </div>
+
+        <div class="timer-section">
+            <div class="timer-display" id="timer">08:00:00</div>
+            <div class="timer-label">verbleibend</div>
+        </div>
+
+        <div class="extend-section">
+            <div class="extend-label">Zeit verlängern</div>
+            <div class="extend-buttons">
+                <button class="extend-btn" data-hours="8" onclick="selectExtend(this, 8)">
+                    +8h
+                    <div class="sub">Kurz</div>
+                </button>
+                <button class="extend-btn" data-hours="12" onclick="selectExtend(this, 12)">
+                    +12h
+                    <div class="sub">Mittel</div>
+                </button>
+                <button class="extend-btn" data-hours="16" onclick="selectExtend(this, 16)">
+                    +16h
+                    <div class="sub">Lang</div>
+                </button>
+            </div>
+            <button class="ok-btn" id="okBtn" onclick="showConfirm()">
+                OK
+            </button>
+            <button class="reset-btn" onclick="showResetConfirm()">
+                ↺ Reset auf 8 Stunden
+            </button>
+        </div>
+
+        <div class="confirm-overlay" id="confirmOverlay">
+            <div class="confirm-dialog">
+                <div class="icon">⏱️</div>
+                <h3>Zeit verlängern?</h3>
+                <p id="confirmText">Countdown um 8 Stunden verlängern?</p>
+                <div class="btn-group">
+                    <button class="btn-cancel" onclick="hideConfirm()">Abbrechen</button>
+                    <button class="btn-confirm" onclick="confirmExtend()">Verlängern</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="confirm-overlay" id="resetOverlay">
+            <div class="confirm-dialog">
+                <div class="icon">↺</div>
+                <h3>Reset?</h3>
+                <p>Countdown auf 8 Stunden zurücksetzen?</p>
+                <div class="btn-group">
+                    <button class="btn-cancel" onclick="hideResetConfirm()">Abbrechen</button>
+                    <button class="btn-confirm" onclick="confirmReset()">Zurücksetzen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_HOURS = 8;
+        let endTime = new Date(Date.now() + DEFAULT_HOURS * 60 * 60 * 1000);
+        let selectedHours = 0;
+        let timerInterval = setInterval(updateTimer, 1000);
+
+        function updateTimer() {
+            const now = new Date();
+            const diff = endTime - now;
+
+            if (diff <= 0) {
+                document.getElementById('timer').textContent = '00:00:00';
+                document.getElementById('statusBadge').textContent = 'Abgelaufen';
+                document.getElementById('statusBadge').style.background = '#fee8e8';
+                document.getElementById('statusBadge').style.color = '#d94a4a';
+                clearInterval(timerInterval);
+                return;
+            }
+
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+
+            document.getElementById('timer').textContent =
+                `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        function selectExtend(btn, hours) {
+            document.querySelectorAll('.extend-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            selectedHours = hours;
+
+            const okBtn = document.getElementById('okBtn');
+            okBtn.classList.add('active');
+        }
+
+        function showConfirm() {
+            if (selectedHours === 0) return;
+            document.getElementById('confirmText').textContent =
+                `Countdown um ${selectedHours} Stunden verlängern?`;
+            document.getElementById('confirmOverlay').classList.add('show');
+        }
+
+        function hideConfirm() {
+            document.getElementById('confirmOverlay').classList.remove('show');
+        }
+
+        function confirmExtend() {
+            endTime = new Date(endTime.getTime() + selectedHours * 60 * 60 * 1000);
+            updateTimer();
+
+            document.querySelectorAll('.extend-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('okBtn').classList.remove('active');
+            selectedHours = 0;
+            hideConfirm();
+        }
+
+        function showResetConfirm() {
+            document.getElementById('resetOverlay').classList.add('show');
+        }
+
+        function hideResetConfirm() {
+            document.getElementById('resetOverlay').classList.remove('show');
+        }
+
+        function confirmReset() {
+            endTime = new Date(Date.now() + DEFAULT_HOURS * 60 * 60 * 1000);
+
+            document.getElementById('statusBadge').textContent = 'Aktiv';
+            document.getElementById('statusBadge').style.background = '#e8f5e9';
+            document.getElementById('statusBadge').style.color = '#2e7d32';
+
+            if (!timerInterval) {
+                timerInterval = setInterval(updateTimer, 1000);
+            }
+            updateTimer();
+
+            document.querySelectorAll('.extend-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('okBtn').classList.remove('active');
+            selectedHours = 0;
+            hideResetConfirm();
+        }
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>
