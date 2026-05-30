@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Freunde-App</title>
+    <title>Cats</title>
     <meta name="theme-color" content="#4a90d9">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
     <style>
         * {
@@ -54,6 +52,10 @@
             letter-spacing: 1px;
             margin-bottom: 16px;
         }
+        .status-badge.inactive {
+            background: #fee8e8;
+            color: #d94a4a;
+        }
         .event-title {
             font-size: 28px;
             font-weight: 700;
@@ -81,6 +83,15 @@
             margin-top: 8px;
             text-transform: uppercase;
             letter-spacing: 2px;
+        }
+        .loading {
+            font-size: 18px;
+            color: #888;
+        }
+        .error {
+            font-size: 16px;
+            color: #d94a4a;
+            padding: 0 20px;
         }
         .extend-section {
             padding-bottom: 20px;
@@ -118,6 +129,10 @@
             background: #e8f0fe;
             color: #4a90d9;
         }
+        .extend-btn:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
         .extend-btn .sub {
             font-size: 11px;
             font-weight: 400;
@@ -145,6 +160,9 @@
         .ok-btn:active {
             transform: scale(0.98);
         }
+        .ok-btn:disabled {
+            background: #ccc;
+        }
         .reset-btn {
             width: 100%;
             padding: 14px;
@@ -161,6 +179,10 @@
         .reset-btn:active {
             transform: scale(0.98);
             background: #f5f5f5;
+        }
+        .reset-btn:disabled {
+            opacity: 0.4;
+            pointer-events: none;
         }
         .confirm-overlay {
             position: absolute;
@@ -224,32 +246,31 @@
             color: white;
         }
     </style>
-<base target="_blank">
 </head>
 <body>
     <div class="app-container">
         <div class="header">
-            <div class="status-badge" id="statusBadge">Aktiv</div>
-            <div class="event-title">Abend mit Freunden</div>
+            <div class="status-badge" id="statusBadge">Laden...</div>
+            <div class="event-title">Cats</div>
         </div>
 
-        <div class="timer-section">
-            <div class="timer-display" id="timer">08:00:00</div>
-            <div class="timer-label">verbleibend</div>
+        <div class="timer-section" id="timerSection">
+            <div class="loading" id="timerDisplay">Lade...</div>
+            <div class="timer-label" id="timerLabel">verbleibend</div>
         </div>
 
         <div class="extend-section">
             <div class="extend-label">Zeit verlängern</div>
             <div class="extend-buttons">
-                <button class="extend-btn" data-hours="8" onclick="selectExtend(this, 8)">
+                <button class="extend-btn" data-hours="8" onclick="selectExtend(this, 8)" id="btn8h">
                     +8h
                     <div class="sub">Kurz</div>
                 </button>
-                <button class="extend-btn" data-hours="12" onclick="selectExtend(this, 12)">
+                <button class="extend-btn" data-hours="12" onclick="selectExtend(this, 12)" id="btn12h">
                     +12h
                     <div class="sub">Mittel</div>
                 </button>
-                <button class="extend-btn" data-hours="16" onclick="selectExtend(this, 16)">
+                <button class="extend-btn" data-hours="16" onclick="selectExtend(this, 16)" id="btn16h">
                     +16h
                     <div class="sub">Lang</div>
                 </button>
@@ -257,7 +278,7 @@
             <button class="ok-btn" id="okBtn" onclick="showConfirm()">
                 OK
             </button>
-            <button class="reset-btn" onclick="showResetConfirm()">
+            <button class="reset-btn" id="resetBtn" onclick="showResetConfirm()">
                 ↺ Reset auf 8 Stunden
             </button>
         </div>
@@ -288,20 +309,53 @@
     </div>
 
     <script>
-        const DEFAULT_HOURS = 8;
-        let endTime = new Date(Date.now() + DEFAULT_HOURS * 60 * 60 * 1000);
+        // API URL - HIER DEINE URL EINTRAGEN
+        const API_URL = 'https://9rgtwojmy1.execute-api.eu-central-1.amazonaws.com/prod';
+
+        let endTime = null;
         let selectedHours = 0;
-        let timerInterval = setInterval(updateTimer, 1000);
+        let timerInterval = null;
+        let isLoading = false;
+
+        // Beim Start: Zeit vom Server holen
+        async function loadTime() {
+            setLoading(true);
+            try {
+                const response = await fetch(`${API_URL}/time`);
+                const data = await response.json();
+
+                if (data.active && data.endTime > 0) {
+                    endTime = data.endTime;
+                    startTimer();
+                    updateStatus(true);
+                } else {
+                    endTime = null;
+                    showNoActiveEvent();
+                    updateStatus(false);
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden:', error);
+                showError('Verbindung fehlgeschlagen');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
 
         function updateTimer() {
-            const now = new Date();
+            if (!endTime) return;
+            const now = Date.now();
             const diff = endTime - now;
 
             if (diff <= 0) {
-                document.getElementById('timer').textContent = '00:00:00';
-                document.getElementById('statusBadge').textContent = 'Abgelaufen';
-                document.getElementById('statusBadge').style.background = '#fee8e8';
-                document.getElementById('statusBadge').style.color = '#d94a4a';
+                document.getElementById('timerDisplay').textContent = '00:00:00';
+                document.getElementById('timerDisplay').className = 'timer-display';
+                updateStatus(false);
                 clearInterval(timerInterval);
                 return;
             }
@@ -310,8 +364,67 @@
             const m = Math.floor((diff % 3600000) / 60000);
             const s = Math.floor((diff % 60000) / 1000);
 
-            document.getElementById('timer').textContent =
+            document.getElementById('timerDisplay').textContent = 
                 `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            document.getElementById('timerDisplay').className = 'timer-display';
+        }
+
+        function updateStatus(active) {
+            const badge = document.getElementById('statusBadge');
+            if (active) {
+                badge.textContent = 'Aktiv';
+                badge.className = 'status-badge';
+            } else {
+                badge.textContent = 'Inaktiv';
+                badge.className = 'status-badge inactive';
+            }
+        }
+
+        function showNoActiveEvent() {
+            document.getElementById('timerDisplay').textContent = '--:--:--';
+            document.getElementById('timerDisplay').className = 'timer-display';
+        }
+
+        function showError(msg) {
+            document.getElementById('timerDisplay').textContent = msg;
+            document.getElementById('timerDisplay').className = 'error';
+        }
+
+        function setLoading(loading) {
+            isLoading = loading;
+            const buttons = document.querySelectorAll('.extend-btn, .ok-btn, .reset-btn');
+            buttons.forEach(btn => btn.disabled = loading);
+
+            if (loading) {
+                document.getElementById('timerDisplay').textContent = 'Lade...';
+                document.getElementById('timerDisplay').className = 'loading';
+            }
+        }
+
+        async function saveTime(hours) {
+            setLoading(true);
+            try {
+                const response = await fetch(`${API_URL}/time`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ hours: hours })
+                });
+
+                const data = await response.json();
+
+                if (data.endTime) {
+                    endTime = data.endTime;
+                    startTimer();
+                    updateStatus(true);
+                }
+            } catch (error) {
+                console.error('Fehler beim Speichern:', error);
+                showError('Speichern fehlgeschlagen');
+            } finally {
+                setLoading(false);
+            }
         }
 
         function selectExtend(btn, hours) {
@@ -324,9 +437,9 @@
         }
 
         function showConfirm() {
-            if (selectedHours === 0) return;
+            if (selectedHours === 0 || isLoading) return;
             document.getElementById('confirmText').textContent =
-                `Countdown um ${selectedHours} Stunden verlängern?`;
+                `Countdown auf ${selectedHours} Stunden setzen?`;
             document.getElementById('confirmOverlay').classList.add('show');
         }
 
@@ -334,9 +447,8 @@
             document.getElementById('confirmOverlay').classList.remove('show');
         }
 
-        function confirmExtend() {
-            endTime = new Date(endTime.getTime() + selectedHours * 60 * 60 * 1000);
-            updateTimer();
+        async function confirmExtend() {
+            await saveTime(selectedHours);
 
             document.querySelectorAll('.extend-btn').forEach(b => b.classList.remove('selected'));
             document.getElementById('okBtn').classList.remove('active');
@@ -345,6 +457,7 @@
         }
 
         function showResetConfirm() {
+            if (isLoading) return;
             document.getElementById('resetOverlay').classList.add('show');
         }
 
@@ -352,24 +465,15 @@
             document.getElementById('resetOverlay').classList.remove('show');
         }
 
-        function confirmReset() {
-            endTime = new Date(Date.now() + DEFAULT_HOURS * 60 * 60 * 1000);
-
-            document.getElementById('statusBadge').textContent = 'Aktiv';
-            document.getElementById('statusBadge').style.background = '#e8f5e9';
-            document.getElementById('statusBadge').style.color = '#2e7d32';
-
-            if (!timerInterval) {
-                timerInterval = setInterval(updateTimer, 1000);
-            }
-            updateTimer();
-
-            document.querySelectorAll('.extend-btn').forEach(b => b.classList.remove('selected'));
-            document.getElementById('okBtn').classList.remove('active');
-            selectedHours = 0;
+        async function confirmReset() {
+            await saveTime(8);
             hideResetConfirm();
         }
 
+        // App starten
+        loadTime();
+
+        // Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(() => {});
         }
