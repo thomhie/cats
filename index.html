@@ -401,10 +401,11 @@
             }
         }
 
-        async function saveTime(hours) {
+        // EXTEND: POST /time/extend (adds hours to existing time)
+        async function extendTime(hours) {
             setLoading(true);
             try {
-                const response = await fetch(`${API_URL}/time`, {
+                const response = await fetch(`${API_URL}/time/extend`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -420,8 +421,35 @@
                     updateStatus(true);
                 }
             } catch (error) {
-                console.error('Fehler beim Speichern:', error);
-                showError('Speichern fehlgeschlagen');
+                console.error('Fehler beim Verlaengern:', error);
+                showError('Verlaengern fehlgeschlagen');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // RESET: POST /reset (sets new time)
+        async function resetTime(hours) {
+            setLoading(true);
+            try {
+                const response = await fetch(`${API_URL}/reset`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ hours: hours })
+                });
+
+                const data = await response.json();
+
+                if (data.endTime) {
+                    endTime = data.endTime;
+                    startTimer();
+                    updateStatus(true);
+                }
+            } catch (error) {
+                console.error('Fehler beim Reset:', error);
+                showError('Reset fehlgeschlagen');
             } finally {
                 setLoading(false);
             }
@@ -439,7 +467,7 @@
         function showConfirm() {
             if (selectedHours === 0 || isLoading) return;
             document.getElementById('confirmText').textContent =
-                `Countdown auf ${selectedHours} Stunden setzen?`;
+                `Countdown um ${selectedHours} Stunden verlängern?`;
             document.getElementById('confirmOverlay').classList.add('show');
         }
 
@@ -448,7 +476,7 @@
         }
 
         async function confirmExtend() {
-            await saveTime(selectedHours);
+            await extendTime(selectedHours);
 
             document.querySelectorAll('.extend-btn').forEach(b => b.classList.remove('selected'));
             document.getElementById('okBtn').classList.remove('active');
@@ -466,7 +494,7 @@
         }
 
         async function confirmReset() {
-            await saveTime(8);
+            await resetTime(8);
             hideResetConfirm();
         }
 
