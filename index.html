@@ -35,6 +35,38 @@
             justify-content: space-between;
             padding: 40px 24px;
             position: relative;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .pull-indicator {
+            position: absolute;
+            top: -50px;
+            left: 0;
+            right: 0;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            font-size: 14px;
+            transition: top 0.3s ease;
+            z-index: 10;
+        }
+        .pull-indicator.visible {
+            top: 0;
+        }
+        .pull-indicator.spinner::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid #4a90d9;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
         .header {
             text-align: center;
@@ -76,6 +108,9 @@
             font-variant-numeric: tabular-nums;
             line-height: 1;
             letter-spacing: -2px;
+        }
+        .timer-display.negative {
+            color: #d94a4a;
         }
         .timer-label {
             font-size: 14px;
@@ -248,7 +283,11 @@
     </style>
 </head>
 <body>
-    <div class="app-container">
+    <div class="app-container" id="appContainer">
+        <div class="pull-indicator" id="pullIndicator">
+            ↓ Ziehen zum Aktualisieren
+        </div>
+
         <div class="header">
             <div class="status-badge" id="statusBadge">Laden...</div>
             <div class="event-title">Cats</div>
@@ -287,7 +326,7 @@
             <div class="confirm-dialog">
                 <div class="icon">⏱️</div>
                 <h3>Zeit verlängern?</h3>
-                <p id="confirmText">Countdown um 8 Stunden verlängern?</p>
+                <p id="confirmText">Countdown um 4 Stunden verlängern?</p>
                 <div class="btn-group">
                     <button class="btn-cancel" onclick="hideConfirm()">Abbrechen</button>
                     <button class="btn-confirm" onclick="confirmExtend()">Verlängern</button>
@@ -309,7 +348,6 @@
     </div>
 
     <script>
-        // API URL - HIER DEINE URL EINTRAGEN
         const API_URL = 'https://9rgtwojmy1.execute-api.eu-central-1.amazonaws.com/prod';
 
         let endTime = null;
@@ -317,7 +355,55 @@
         let timerInterval = null;
         let isLoading = false;
 
-        // Beim Start: Zeit vom Server holen
+        // Pull-to-Refresh
+        let touchStartY = 0;
+        let touchCurrentY = 0;
+        let isPulling = false;
+        const pullThreshold = 80;
+        const container = document.getElementById('appContainer');
+        const pullIndicator = document.getElementById('pullIndicator');
+
+        container.addEventListener('touchstart', (e) => {
+            if (container.scrollTop === 0) {
+                touchStartY = e.touches[0].clientY;
+                isPulling = true;
+            }
+        }, { passive: true });
+
+        container.addEventListener('touchmove', (e) => {
+            if (!isPulling) return;
+            touchCurrentY = e.touches[0].clientY;
+            const diff = touchCurrentY - touchStartY;
+
+            if (diff > 0 && diff < pullThreshold) {
+                pullIndicator.style.top = `${-50 + diff}px`;
+                pullIndicator.classList.add('visible');
+            } else if (diff >= pullThreshold) {
+                pullIndicator.textContent = 'Loslassen zum Aktualisieren';
+            }
+        }, { passive: true });
+
+        container.addEventListener('touchend', () => {
+            if (!isPulling) return;
+            const diff = touchCurrentY - touchStartY;
+
+            if (diff >= pullThreshold) {
+                pullIndicator.textContent = '';
+                pullIndicator.classList.add('spinner');
+                loadTime().then(() => {
+                    pullIndicator.classList.remove('spinner', 'visible');
+                    pullIndicator.style.top = '-50px';
+                    pullIndicator.textContent = '↓ Ziehen zum Aktualisieren';
+                });
+            } else {
+                pullIndicator.classList.remove('visible');
+                pullIndicator.style.top = '-50px';
+            }
+            isPulling = false;
+            touchStartY = 0;
+            touchCurrentY = 0;
+        });
+
         async function loadTime() {
             setLoading(true);
             try {
@@ -329,8 +415,8 @@
                     startTimer();
                     updateStatus(true);
                 } else {
-                    endTime = null;
-                    showNoActiveEvent();
+                    endTime = data.endTime || null;
+                    startTimer();
                     updateStatus(false);
                 }
             } catch (error) {
@@ -348,25 +434,32 @@
         }
 
         function updateTimer() {
-            if (!endTime) return;
-            const now = Date.now();
-            const diff = endTime - now;
-
-            if (diff <= 0) {
-                document.getElementById('timerDisplay').textContent = '00:00:00';
-                document.getElementById('timerDisplay').className = 'timer-display';
-                updateStatus(false);
-                clearInterval(timerInterval);
+            if (!endTime) {
+                showNoActiveEvent();
                 return;
             }
 
-            const h = Math.floor(diff / 3600000);
-            const m = Math.floor((diff % 3600000) / 60000);
-            const s = Math.floor((diff % 60000) / 1000);
+            const now = Date.now();
+            const diff = endTime - now;
+            const absDiff = Math.abs(diff);
 
-            document.getElementById('timerDisplay').textContent = 
+            const h = Math.floor(absDiff / 3600000);
+            const m = Math.floor((absDiff % 3600000) / 60000);
+            const s = Math.floor((absDiff % 60000) / 1000);
+
+            const timerDisplay = document.getElementById('timerDisplay');
+            timerDisplay.textContent = 
                 `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-            document.getElementById('timerDisplay').className = 'timer-display';
+
+            if (diff <= 0) {
+                timerDisplay.classList.add('negative');
+                document.getElementById('timerLabel').textContent = 'abgelaufen';
+            } else {
+                timerDisplay.classList.remove('negative');
+                document.getElementById('timerLabel').textContent = 'verbleibend';
+            }
+
+            timerDisplay.className = diff <= 0 ? 'timer-display negative' : 'timer-display';
         }
 
         function updateStatus(active) {
@@ -383,6 +476,7 @@
         function showNoActiveEvent() {
             document.getElementById('timerDisplay').textContent = '--:--:--';
             document.getElementById('timerDisplay').className = 'timer-display';
+            document.getElementById('timerLabel').textContent = 'verbleibend';
         }
 
         function showError(msg) {
@@ -401,15 +495,12 @@
             }
         }
 
-        // EXTEND: POST /time/extend (adds hours to existing time)
         async function extendTime(hours) {
             setLoading(true);
             try {
                 const response = await fetch(`${API_URL}/time/extend`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ hours: hours })
                 });
 
@@ -428,15 +519,12 @@
             }
         }
 
-        // RESET: POST /reset (sets new time)
         async function resetTime(hours) {
             setLoading(true);
             try {
                 const response = await fetch(`${API_URL}/reset`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ hours: hours })
                 });
 
